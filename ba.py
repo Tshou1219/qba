@@ -6,27 +6,25 @@ import networkx as nx
 
 class BAModel():
     G = None,
-    m0 = 3
+    m0 = 5
     m = 2
     N = 15
 
     def __init__(self):
         self.G = nx.Graph()
-        for i in range(self.m0):
-            self.G.add_nodes_from([i])
-            for j in range(i):
-                self.G.add_edges_from([(i, j)])
+        self.G.add_nodes_from([i for i in range(self.m0)])
+        self.G.add_edges_from([(i, j) for i in range(self.m0)
+                              for j in range(i)])
 
     def run(self):
         for i in range(self.m0, self.N):
             self.G.add_nodes_from([i])
             nodea = np.array(self.G.nodes())
             dega = np.array(self.G.degree())[:, 1]
-            sum = np.sum(dega)
-            degp = dega/sum
             for _ in range(self.m):
                 while True:
-                    new = int(str(random.choices(nodea, degp))[1:2])
+                    new = int(
+                        str(random.choices(nodea, dega/np.sum(dega)))[1:2])
                     if self.G.has_edge(i, new) or i == new:
                         continue
                     self.G.add_edges_from([(i, new)])
