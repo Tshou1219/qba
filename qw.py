@@ -11,7 +11,7 @@ class ArcGraph():
         self.graph = DiGraph(edges+[(b, a) for (a, b) in edges])
 
     def complete_graph(self, n: int) -> DiGraph:
-        node = list(map(str, range(1, n+1)))
+        node = list(map(int, range(1, n+1)))
         self.graph = DiGraph()
         self.graph.add_nodes_from(node)
         self.graph.add_edges_from(
