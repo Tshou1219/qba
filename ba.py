@@ -13,7 +13,7 @@ class BAModel():
         self.G.add_edges_from([(i, j) for i in range(m0)
                               for j in range(i)])
 
-    def run(self, m, N):
+    def ba_run(self, m, N):
         for i in range(self.G.number_of_nodes(), N):
             self.G.add_nodes_from([i])
             nodea = np.array(self.G.nodes())
