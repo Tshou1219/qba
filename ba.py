@@ -21,7 +21,7 @@ class BAModel():
             for _ in range(m):
                 while True:
                     new = int(
-                        str(random.choices(nodea, dega/np.sum(dega)))[1:2])
+                        str(random.choices(nodea, dega/np.sum(dega)))[1:].rstrip(']'))
                     if self.G.has_edge(i, new) or i == new:
                         continue
                     self.G.add_edges_from([(i, new)])
