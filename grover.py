@@ -79,7 +79,7 @@ class Grover():
                         else:
                             weight_copy[j] += weight*(2/(deg[edges[0]]))
             # 収束判定
-            if np.linalg.norm(out-beta_out, ord=2) < 0.001:
+            if np.linalg.norm(out-beta_out, ord=2) < 0.01:
                 # print(n)
                 break
             ###
@@ -88,11 +88,19 @@ class Grover():
         self.curved_edge_labels = {edge: weight for edge,
                                    weight in zip(self.curved_edge, self.curved_weight)}
 
-    # def make_grover_matrix(self, n):
-    #     grover_matrix = np.full((n, n), 2/n)
-    #     for i in range(n):
-    #         grover_matrix[i][i] -= 1
-    #     print(grover_matrix@[1, 1, 0])
+    def ba_run(self, m, N):
+        for i in range(self.G.number_of_nodes(), N):
+            self.G.add_nodes_from([i])
+            nodea = np.array(self.G.nodes())
+            dega = np.array(self.G.to_undirected().degree())[:, 1]
+            for _ in range(m):
+                while True:
+                    new = int(
+                        str(random.choices(nodea, dega/np.sum(dega)))[1:].rstrip(']'))
+                    if self.G.has_edge(i, new) or i == new:
+                        continue
+                    self.G.add_edges_from([(i, new)])
+                    break
 
     def qba_run(self, m, path: List[Tuple[int, float]]):
         nodea = np.array(self.G.nodes())
@@ -142,3 +150,43 @@ class Grover():
         label.my_draw_networkx_edge_labels(
             self.G, pos, ax=ax, edge_labels=self.curved_edge_labels, rotate=False, rad=0.25)
         #print(self.curved_edge, self.curved_weight)
+
+    def deg_plot(self):
+        # bins = range(1, self.G.number_of_nodes())
+        # dega = np.array(self.G.degree())[:, 1]/2
+        # print(dega)
+        # plt.hist(dega, bins=bins)
+        # plt.show()
+        #G = nx.gnp_random_graph(100, 0.02, seed=10374196)
+        #G = nx.barabasi_albert_graph(100, 2)
+        degree_sequence = sorted(
+            (d for n, d in self.G.to_undirected().degree()), reverse=True)
+        dmax = max(degree_sequence)
+
+        fig = plt.figure("Degree of a random graph", figsize=(8, 8))
+        # Create a gridspec for adding subplots of different sizes
+        axgrid = fig.add_gridspec(5, 4)
+
+        ax0 = fig.add_subplot(axgrid[0:3, :])
+        Gcc = self.G.to_undirected().subgraph(
+            sorted(nx.connected_components(self.G.to_undirected()), key=len, reverse=True)[0])
+        pos = nx.spring_layout(Gcc, seed=10396953)
+        nx.draw_networkx_nodes(Gcc, pos, ax=ax0, node_size=20)
+        nx.draw_networkx_edges(Gcc, pos, ax=ax0, alpha=0.4)
+        ax0.set_title("Connected components of G")
+        ax0.set_axis_off()
+
+        ax1 = fig.add_subplot(axgrid[3:, :2])
+        ax1.plot(degree_sequence, "b-", marker="o")
+        ax1.set_title("Degree Rank Plot")
+        ax1.set_ylabel("Degree")
+        ax1.set_xlabel("Rank")
+
+        ax2 = fig.add_subplot(axgrid[3:, 2:])
+        ax2.bar(*np.unique(degree_sequence, return_counts=True))
+        ax2.set_title("Degree histogram")
+        ax2.set_xlabel("Degree")
+        ax2.set_ylabel("# of Nodes")
+
+        fig.tight_layout()
+        plt.show()
