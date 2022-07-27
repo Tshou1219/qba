@@ -4,18 +4,9 @@ def my_draw_networkx_edge_labels(
     G,
     pos,
     edge_labels=None,
-    label_pos=0.5,
-    font_size=10,
-    font_color="k",
-    font_family="sans-serif",
-    font_weight="normal",
-    alpha=None,
-    bbox=None,
-    horizontalalignment="center",
-    verticalalignment="center",
+    label_pos=0.5, 
     ax=None,
     rotate=True,
-    clip_on=True,
     rad=0
 ):
     if ax is None:
@@ -58,9 +49,7 @@ def my_draw_networkx_edge_labels(
             )[0]
         else:
             trans_angle = 0.0
-        # use default box of white with white border
-        if bbox is None:
-            bbox = dict(boxstyle="round", ec=(1.0, 1.0, 1.0), fc=(1.0, 1.0, 1.0))
+        bbox = dict(boxstyle="round", ec=(1.0, 1.0, 1.0), fc=(1.0, 1.0, 1.0))
         if not isinstance(label, str):
             label = str(label)  # this makes "1" and 1 labeled the same
 
@@ -68,18 +57,18 @@ def my_draw_networkx_edge_labels(
             x,
             y,
             label,
-            size=font_size,
-            color=font_color,
-            family=font_family,
-            weight=font_weight,
-            alpha=alpha,
-            horizontalalignment=horizontalalignment,
-            verticalalignment=verticalalignment,
+            size=10,
+            color="k",
+            family="sans-serif",
+            weight="normal",
+            alpha=None,
+            horizontalalignment="center",
+            verticalalignment="center",
             rotation=trans_angle,
             transform=ax.transData,
             bbox=bbox,
             zorder=1,
-            clip_on=clip_on,
+            clip_on=True,
         )
         text_items[(n1, n2)] = t
 

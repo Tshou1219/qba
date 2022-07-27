@@ -85,7 +85,7 @@ class Grover():
             ###
             self.curved_weight = weight_copy
         # print(out)
-        self.curved_edge_labels = {edge: weight for edge,
+        self.curved_edge_labels = {edge:round(weight,2)  for edge,
                                    weight in zip(self.curved_edge, self.curved_weight)}
 
     def ba_run(self, m, N):
@@ -136,7 +136,6 @@ class Grover():
             [(b, a) for idx, a in enumerate(node) for b in node[idx + 1:]])
 
     def plot(self):
-
         nx.draw(self.G.to_undirected(), with_labels=True)
         plt.show()
 
