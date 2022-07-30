@@ -118,8 +118,8 @@ class Grover():
                 break
             self.curved_edge.append((new_node, select))
             self.curved_edge.append((select, new_node))
-            self.curved_weight.append(0.0)
-            self.curved_weight.append(0.0)
+            self.curved_weight.append(self.curved_weight[-1])
+            self.curved_weight.append(self.curved_weight[-1])
 
     def complete_graph(self, n: int):
         node = list(map(int, range(n)))
