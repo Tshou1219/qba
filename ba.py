@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import random
 import networkx as nx
+import time
 
 
 class BAModel():
@@ -30,3 +31,48 @@ class BAModel():
     def draw(self):
         nx.draw(self.G, with_labels=True)
         plt.show()
+
+
+class BAModel_Opt:
+    def __init__(self, m0):
+        self.nodes = np.array(range(m0))
+        self.degs = np.array([m0 - 1] * m0)
+        self.sum = (m0 - 1) * m0
+        self.edges = [(i, j) for i in range(m0) for j in range(i)]
+
+    def ba_run(self, m, N):
+        for i in range(len(self.nodes), N):
+            prevs = set()
+            for _ in range(m):
+                while True:
+                    new = np.random.choice(
+                        self.nodes, 1, p=self.degs / self.sum)[0]
+                    if new in prevs:
+                        continue
+                    self.edges.append((i, new))
+                    self.degs[new] += 1
+                    self.sum += 1
+                    prevs.add(new)
+                    break
+            self.nodes = np.append(self.nodes, i)
+            self.degs = np.append(self.degs, m)
+            self.sum += m
+
+    def draw(self):
+        G = nx.Graph(list(self.edges))
+        nx.draw(G, with_labels=True)
+        plt.show()
+
+
+time_sta = time.perf_counter()
+bamodel = BAModel(4)
+bamodel.ba_run(2, 10000)
+time_end = time.perf_counter()
+print(time_end - time_sta)
+# bamodel.draw()
+time_sta = time.perf_counter()
+bamodel = BAModel_Opt(4)
+bamodel.ba_run(1, 10000)
+time_end = time.perf_counter()
+print(time_end - time_sta)
+# bamodel.draw()

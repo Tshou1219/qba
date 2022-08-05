@@ -50,9 +50,8 @@ class Grover():
         for p in path:
             deg[p[0]] += 1
 
-        grover_matrix = np.full((len(path), len(path)), 2/(len(path)))
-        for i in range(len(path)):
-            grover_matrix[i][i] -= 1.0
+        grover_matrix = self.make_grover_matrix(len(path))
+
         div = [flowed_weight for flowed_weight in zip(*path)]
         beta_in = div[1]
         beta_out = grover_matrix@beta_in
@@ -83,8 +82,6 @@ class Grover():
                 print(np.linalg.norm(out-beta_out, ord=2))
                 break
             if np.linalg.norm(out-beta_out, ord=2) < 0.0001:
-                # if n != 0:
-                #     print(n, self.G.number_of_nodes()-3)
                 #print(np.linalg.norm(out-beta_out, ord=2))
                 break
             ###
@@ -131,12 +128,22 @@ class Grover():
             self.curved_weight.append(self.curved_weight[-1])
             self.neighbor[new_node].append(selected)
             self.neighbor[selected].append(new_node)
+            # if selected != 0 and selected != 1:
+            #     print(selected, self.G.number_of_nodes()-3)
 
     def complete_graph(self, n: int):
         node = list(map(int, range(n)))
         edges = [(a, b) for idx, a in enumerate(node) for b in node[idx + 1:]] + \
             [(b, a) for idx, a in enumerate(node) for b in node[idx + 1:]]
         self.initilize_graph(edges)
+
+    def make_grover_matrix(self, n):
+        grover_matrix = np.full((n, n), 2/n)
+        for i in range(n):
+            grover_matrix[i][i] -= 1.0
+        return grover_matrix
+
+    # def check_convergence(out):
 
     def plot(self):
         nx.draw(self.G.to_undirected(), with_labels=True)
