@@ -77,14 +77,12 @@ class Grover():
                         weight_copy[j] += weight * \
                             (2/(deg[edges[1]]))
 
-            # 収束判定
             if n == 9999 and np.linalg.norm(out-beta_out, ord=2) < 0.01:
                 print(np.linalg.norm(out-beta_out, ord=2))
                 break
-            if np.linalg.norm(out-beta_out, ord=2) < 0.0001:
-                #print(np.linalg.norm(out-beta_out, ord=2))
+            if self.check_convergence(np.linalg.norm(out-beta_out, ord=2), 0.0001):
                 break
-            ###
+
             self.curved_weight = weight_copy
         self.curved_edge_labels = {edge: round(weight, 2) for edge,
                                    weight in zip(self.curved_edge, self.curved_weight)}
@@ -128,8 +126,6 @@ class Grover():
             self.curved_weight.append(self.curved_weight[-1])
             self.neighbor[new_node].append(selected)
             self.neighbor[selected].append(new_node)
-            # if selected != 0 and selected != 1:
-            #     print(selected, self.G.number_of_nodes()-3)
 
     def complete_graph(self, n: int):
         node = list(map(int, range(n)))
@@ -143,7 +139,11 @@ class Grover():
             grover_matrix[i][i] -= 1.0
         return grover_matrix
 
-    # def check_convergence(out):
+    def check_convergence(self, norm, epsilon) -> bool:
+        if norm < epsilon:
+            return True
+        else:
+            return False
 
     def plot(self):
         nx.draw(self.G.to_undirected(), with_labels=True)
