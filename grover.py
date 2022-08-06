@@ -25,49 +25,34 @@ class Grover():
         self.neighbor = [[i for i in self.G.neighbors(
             j)] for j in range(self.G.number_of_nodes())]
 
-    def run_grover(self, n):
+    def grover(self, n, path: List[Tuple[int, float]]):
+        if len(path) != 0:
+            flowed = True
+        else:
+            flowed = False
         deg = [int(d/2) for _, d in self.G.degree()]
-        for n in range(n):
-            weight_copy = [0.0 for _ in range(len(self.curved_edge))]
-            for i, (weight, edges) in enumerate(zip(self.curved_weight, self.curved_edge)):
-                if weight == 0:
-                    continue
-                neighbor = [n for n in self.G.neighbors(edges[1])]
-                for neighborhood in neighbor:
-                    j = self.curved_edge.index((edges[1], neighborhood))
-                    if edges[0] == neighborhood:
-                        weight_copy[j] += weight * \
-                            ((2/(deg[edges[1]]))-1)
-                    else:
-                        weight_copy[j] += weight * \
-                            (2/(deg[edges[1]]))
-            self.curved_weight = weight_copy
-        self.curved_edge_labels = {edge: weight for edge,
-                                   weight in zip(self.curved_edge, self.curved_weight)}
-
-    def run_flowed_grover(self, n, path: List[Tuple[int, float]]):
-        deg = [int(d/2) for _, d in self.G.degree()]
-        for p in path:
-            deg[p[0]] += 1
-
-        grover_matrix = self.make_grover_matrix(len(path))
-
-        div = [flowed_weight for flowed_weight in zip(*path)]
-        beta_in = div[1]
-        beta_out = grover_matrix@beta_in
+        if flowed:
+            for p in path:
+                deg[p[0]] += 1
+            grover_matrix = self.make_grover_matrix(len(path))
+            flowed_weight = [flowed for flowed in zip(*path)]
+            beta_in = flowed_weight[1]
+            beta_out = grover_matrix@beta_in
         for n in range(n):
             weight_copy = [0.0 for _ in range(len(self.curved_edge))]
             out = [p[1]*(2/(deg[p[0]])-1) for p in path]
             for i, (weight, edges) in enumerate(zip(self.curved_weight, self.curved_edge)):
-                for p in path:
-                    if edges[0] == p[0]:
-                        weight_copy[i] += p[1]*(2/(deg[edges[0]]))
+                if flowed:
+                    for p in path:
+                        if edges[0] == p[0]:
+                            weight_copy[i] += p[1]*(2/(deg[edges[0]]))
+                    for p in list(flowed_weight[0]):
+                        if self.curved_edge[i][1] == p:
+                            out[list(flowed_weight[0]).index(p)
+                                ] += weight*(2/(deg[p]))
+
                 if weight == 0:
                     continue
-                for p in list(div[0]):
-                    if self.curved_edge[i][1] == p:
-                        out[list(div[0]).index(p)] += weight*(2/(deg[p]))
-
                 for neighborhood in self.neighbor[edges[1]]:
                     j = self.curved_edge.index((edges[1], neighborhood))
                     if edges[0] == neighborhood:
@@ -76,13 +61,12 @@ class Grover():
                     else:
                         weight_copy[j] += weight * \
                             (2/(deg[edges[1]]))
-
-            if n == 9999 and np.linalg.norm(out-beta_out, ord=2) < 0.01:
-                print(np.linalg.norm(out-beta_out, ord=2))
-                break
-            if self.check_convergence(np.linalg.norm(out-beta_out, ord=2), 0.0001):
-                break
-
+            if flowed:
+                if n == 9999 and np.linalg.norm(out-beta_out, ord=2) < 0.01:
+                    print(np.linalg.norm(out-beta_out, ord=2))
+                    break
+                if self.check_convergence(np.linalg.norm(out-beta_out, ord=2), 0.0001):
+                    break
             self.curved_weight = weight_copy
         self.curved_edge_labels = {edge: round(weight, 2) for edge,
                                    weight in zip(self.curved_edge, self.curved_weight)}
