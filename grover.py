@@ -13,6 +13,7 @@ class Grover():
     curved_edge_labels = None
     curved_weight = None
     neighbor = None
+    count = np.array([])
 
     def __init__(self, edges: List[Tuple[int, int]]) -> None:
         self.initilize_graph(edges)
@@ -25,11 +26,8 @@ class Grover():
         self.neighbor = [[i for i in self.G.neighbors(
             j)] for j in range(self.G.number_of_nodes())]
 
-    def grover(self, n, path: List[Tuple[int, float]]):
-        if len(path) != 0:
-            flowed = True
-        else:
-            flowed = False
+    def grover(self, max, path: List[Tuple[int, float]]):
+        flowed = len(path) != 0
         deg = [int(d/2) for _, d in self.G.degree()]
         if flowed:
             for p in path:
@@ -38,7 +36,7 @@ class Grover():
             flowed_weight = [flowed for flowed in zip(*path)]
             beta_in = flowed_weight[1]
             beta_out = grover_matrix@beta_in
-        for n in range(n):
+        for n in range(max):
             weight_copy = [0.0 for _ in range(len(self.curved_edge))]
             out = [p[1]*(2/(deg[p[0]])-1) for p in path]
             for i, (weight, edges) in enumerate(zip(self.curved_weight, self.curved_edge)):
@@ -62,10 +60,22 @@ class Grover():
                         weight_copy[j] += weight * \
                             (2/(deg[edges[1]]))
             if flowed:
-                if n == 9999 and np.linalg.norm(out-beta_out, ord=2) < 0.01:
-                    print(np.linalg.norm(out-beta_out, ord=2))
+                # if n == max-1 and np.linalg.norm(out-beta_out, ord=2) < 0.01:
+                #     print(np.linalg.norm(np.array(out)-np.array(beta_out), ord=2))
+                #     break
+                # if self.check_convergence(np.linalg.norm(np.array(out)-np.array(beta_out)), 0.01):
+                #     print(self.G.number_of_nodes()-3, n)
+                #     break
+                # if max-10 < n and n < max:
+                #     print(n, np.linalg.norm(np.array(
+                #         self.curved_weight) - np.array(weight_copy), ord=2))
+                #     print(np.array(weight_copy))
+                ###########
+                if n == max-1:
                     break
-                if self.check_convergence(np.linalg.norm(out-beta_out, ord=2), 0.0001):
+                if self.check_convergence(np.linalg.norm(np.array(self.curved_weight)-np.array(weight_copy), ord=2), 0.01):
+                    #print(self.G.number_of_nodes()-3, n)
+                    self.count = np.append(self.count, n)
                     break
             self.curved_weight = weight_copy
         self.curved_edge_labels = {edge: round(weight, 2) for edge,
@@ -110,6 +120,7 @@ class Grover():
             self.curved_weight.append(self.curved_weight[-1])
             self.neighbor[new_node].append(selected)
             self.neighbor[selected].append(new_node)
+            self.curved_weight = [1.0 for _ in range(len(self.curved_edge))]
 
     def complete_graph(self, n: int):
         node = list(map(int, range(n)))
@@ -128,6 +139,12 @@ class Grover():
             return True
         else:
             return False
+
+    def make_count_histgram(self):
+        plt.figure(facecolor="azure", edgecolor="coral")
+        plt.bar([i for i, _ in enumerate(self.count)], self.count)
+        plt.title("number of run")
+        plt.show()
 
     def plot(self):
         nx.draw(self.G.to_undirected(), with_labels=True)
