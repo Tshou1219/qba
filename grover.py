@@ -14,6 +14,7 @@ class Grover():
     curved_weight = None
     neighbor = None
     count = np.array([])
+    deg = None
 
     def __init__(self, edges: List[Tuple[int, int]]) -> None:
         self.initilize_graph(edges)
@@ -25,29 +26,31 @@ class Grover():
                               for _ in range(len(self.curved_edge))]
         self.neighbor = [[i for i in self.G.neighbors(
             j)] for j in range(self.G.number_of_nodes())]
+        self.deg = [int(d/2) for _, d in self.G.degree()]
 
     def grover(self, max, path: List[Tuple[int, float]]):
         flowed = len(path) != 0
-        deg = [int(d/2) for _, d in self.G.degree()]
+        self.curved_weight = [
+            1/np.sqrt(2), 0., 0., 1/np.sqrt(2), 0., 0., 0., 0.]
         if flowed:
             for p in path:
-                deg[p[0]] += 1
-            grover_matrix = self.make_grover_matrix(len(path))
+                self.deg[p[0]] += 1
+            grover_matrix = self.make_flowed_grover_matrix(len(path))
             flowed_weight = [flowed for flowed in zip(*path)]
             beta_in = flowed_weight[1]
             beta_out = grover_matrix@beta_in
         for n in range(max):
             weight_copy = [0.0 for _ in range(len(self.curved_edge))]
-            out = [p[1]*(2/(deg[p[0]])-1) for p in path]
+            out = [p[1]*(2/(self.deg[p[0]])-1) for p in path]
             for i, (weight, edges) in enumerate(zip(self.curved_weight, self.curved_edge)):
                 if flowed:
                     for p in path:
                         if edges[0] == p[0]:
-                            weight_copy[i] += p[1]*(2/(deg[edges[0]]))
+                            weight_copy[i] += p[1]*(2/(self.deg[edges[0]]))
                     for p in list(flowed_weight[0]):
                         if self.curved_edge[i][1] == p:
                             out[list(flowed_weight[0]).index(p)
-                                ] += weight*(2/(deg[p]))
+                                ] += weight*(2/(self.deg[p]))
 
                 if weight == 0:
                     continue
@@ -55,10 +58,10 @@ class Grover():
                     j = self.curved_edge.index((edges[1], neighborhood))
                     if edges[0] == neighborhood:
                         weight_copy[j] += weight * \
-                            ((2/(deg[edges[1]]))-1)
+                            ((2/(self.deg[edges[1]]))-1)
                     else:
                         weight_copy[j] += weight * \
-                            (2/(deg[edges[1]]))
+                            (2/(self.deg[edges[1]]))
             if flowed:
                 # if n == max-1 and np.linalg.norm(out-beta_out, ord=2) < 0.01:
                 #     print(np.linalg.norm(np.array(out)-np.array(beta_out), ord=2))
@@ -80,6 +83,25 @@ class Grover():
             self.curved_weight = weight_copy
         self.curved_edge_labels = {edge: round(weight, 2) for edge,
                                    weight in zip(self.curved_edge, self.curved_weight)}
+
+    def matrix_grover(self, n, path: List[Tuple[int, float]]):
+        state = np.array(
+            [1/np.sqrt(2), 0., 0., 1/np.sqrt(2), 0., 0., 0., 0.]).T
+        for p in path:
+            self.deg[p[0]] += 1
+        flowed_weight = np.array([flowed for flowed in zip(*path)])
+        rho = np.array([0. if len(np.where(flowed_weight[0] == edge[0])[
+                       0]) == 0 else (2/(self.deg[edge[0]]))*flowed_weight[1][np.where(flowed_weight[0] == edge[0])[
+                           0][0]] for edge in self.curved_edge])
+        for _ in range(n):
+            state = self.make_grover_matrix()@state+rho
+        self.curved_weight = state
+        self.curved_edge_labels = {edge: round(weight, 2) for edge,
+                                   weight in zip(self.curved_edge, self.curved_weight)}
+
+    def make_grover_matrix(self):
+        return [[0. if v_edge[1] != h_edge[0] else 2/(self.deg[v_edge[1]]) if v_edge[0] != h_edge[1]
+                 else 2/(self.deg[v_edge[1]])-1 for v_edge in self.curved_edge] for h_edge in self.curved_edge]
 
     def ba_run(self, m, N):
         for i in range(self.G.number_of_nodes(), N):
@@ -113,6 +135,7 @@ class Grover():
                     continue
                 self.G.add_edges_from([(new_node, selected)])
                 self.G.add_edges_from([(selected, new_node)])
+                self.deg[selected] += 1
                 break
             self.curved_edge.append((new_node, selected))
             self.curved_weight.append(self.curved_weight[-1])
@@ -121,6 +144,7 @@ class Grover():
             self.neighbor[new_node].append(selected)
             self.neighbor[selected].append(new_node)
             self.curved_weight = [1.0 for _ in range(len(self.curved_edge))]
+        self.deg.append(m)
 
     def complete_graph(self, n: int):
         node = list(map(int, range(n)))
@@ -128,7 +152,7 @@ class Grover():
             [(b, a) for idx, a in enumerate(node) for b in node[idx + 1:]]
         self.initilize_graph(edges)
 
-    def make_grover_matrix(self, n):
+    def make_flowed_grover_matrix(self, n):
         grover_matrix = np.full((n, n), 2/n)
         for i in range(n):
             grover_matrix[i][i] -= 1.0
