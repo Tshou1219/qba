@@ -94,10 +94,11 @@ class Grover():
             if n == max-1:
                 self.count = np.append(self.count, n)
                 break
-            if self.check_convergence(np.linalg.norm(mat@state+rho-state, ord=2), 0.01):
+            new_state = mat@state+rho
+            if self.check_convergence(np.linalg.norm(new_state/np.linalg.norm(new_state,ord=2)-state/np.linalg.norm(state,ord=2), ord=2), 0.01):
                 self.count = np.append(self.count, n)
                 break
-            state = mat@state+rho
+            state = new_state
         self.curved_weight = state
         self.curved_edge_labels = {edge: round(weight, 2) for edge,
                                    weight in zip(self.curved_edge, self.curved_weight)}

@@ -7,7 +7,7 @@ def my_draw_networkx_edge_labels(
     label_pos=0.5, 
     ax=None,
     rotate=True,
-    rad=0
+    rad=0.
 ):
     if ax is None:
         ax = plt.gca()
