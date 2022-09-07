@@ -17,8 +17,12 @@ class QBA():
 
     def initilize(self, n: int, edges: List[Tuple[int, int]]):
         self.arcs = list(DiGraph(edges+[(b, a) for (a, b) in edges]).edges())
-        self.weights, self.deg = np.ones(
+        self.weights, self.deg = np.zeros(
             len(self.arcs)), np.zeros(n, dtype=int)
+        # set initial state
+        self.weights[0] = 1.0
+        #######
+        self.initial_state = self.weights
         for edge in edges:
             self.deg[edge[0]] += 1
             self.deg[edge[1]] += 1
@@ -127,6 +131,7 @@ class QBA():
             if end_on_conv and self.check_conv(next, self.weights):
                 self.count.append(i)
                 self.weights = next
+                print(i)
                 return
             self.weights = next
         print("not converged")

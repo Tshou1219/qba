@@ -5,14 +5,11 @@ import label
 import numpy as np
 
 
-def plot_time(times: List[float], not_show_and_save=False, save_dir=''):
+def plot_time(times: List[float]):
     plt.figure(facecolor="azure", edgecolor="coral")
     plt.title("times")
     plt.xlabel("total:{}".format(sum(times)))
     plt.bar([i for i, _ in enumerate(times)], times)
-    if not_show_and_save:
-        plt.savefig(save_dir)
-        plt.close()
     plt.show()
 
 
@@ -27,7 +24,7 @@ def plot_arc(G: nx.DiGraph, labels):
         G, pos, ax=ax, edge_labels=labels, rotate=False, rad=0.25)
 
 
-def deg_plot(G: nx.DiGraph, not_show_and_save=False, save_dir=''):
+def deg_plot(G: nx.DiGraph):
     degree_sequence = sorted(
         (d for n, d in G.to_undirected().degree()), reverse=True)
     dmax = max(degree_sequence)
@@ -60,18 +57,11 @@ def deg_plot(G: nx.DiGraph, not_show_and_save=False, save_dir=''):
 
     fig.tight_layout()
 
-    if not_show_and_save:
-        plt.savefig(save_dir)
-        plt.close()
-
     plt.show()
 
 
-def count_histgram(count, not_show_and_save=False, save_dir=''):
+def count_histgram(count):
     plt.figure(facecolor="azure", edgecolor="coral")
     plt.bar([i for i, _ in enumerate(count)], count)
     plt.title("number of run")
-    if not_show_and_save:
-        plt.savefig(save_dir)
-        plt.close()
     plt.show()
