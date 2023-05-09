@@ -9,6 +9,8 @@ from numpy.typing import NDArray
 import plot
 warnings.simplefilter('ignore', category=NumbaPendingDeprecationWarning)
 
+import matplotlib.pyplot as plt
+
 
 class QBA():
 
@@ -19,8 +21,10 @@ class QBA():
         self.arcs = list(DiGraph(edges+[(b, a) for (a, b) in edges]).edges())
         self.weights, self.deg = np.zeros(
             len(self.arcs)), np.zeros(n, dtype=int)
-        # set initial state
-        self.weights[0] = 1.0
+        ### set initial state
+        # self.weights[0] = 1.
+        # for i in range(len(self.arcs)):
+        #     self.weights[i]=1.
         #######
         self.initial_state = self.weights
         for edge in edges:
@@ -32,11 +36,118 @@ class QBA():
                  for edge, weight in zip(self.arcs, self.weights)}
         plot.plot_arc(DiGraph(self.arcs), label)
 
+    
+
+    def run_qba(self, n: int, max: int):
+        self.times = []
+        for _ in range(n):
+            time_sta = time.perf_counter()
+            self.grover(max)
+            self.add_nodes(1)
+            time_end = time.perf_counter()
+            self.times.append(time_end - time_sta)
+        plot.plot_time(self.times)
+        plot.deg_plot(DiGraph(self.arcs))
+        plot.count_histgram(self.count)
+
+    def grover(self, n: int, end_on_conv: bool = True):
+
+        rho = np.zeros(len(self.arcs))
+        np_arc = np.array(self.arcs)
+        for (node, wgt) in self.path:
+            for i in np.where(np_arc[:, 0] == node)[0]:
+                rho[i] = (2 / self.deg[node]) * wgt
+        # print(rho)
+        mat = self.make_grover_matrix()
+        for i in range(n):
+            next = mat @ self.weights + rho ## normal 
+            # next = mat @ self.weights + rho * pow(-1 , len(self.deg)) ## change rho's parity
+            # if end_on_conv and self.check_conv(next, self.weights): ## convergence check
+            if end_on_conv and self.check_conv_grov(next):
+                self.count.append(i)
+                self.weights = next
+                return
+            self.weights = next
+        print("not converged")
+        self.count.append(n)
+
+    def check_conv(self, new_state: NDArray, state: NDArray):
+        def nmz(x): return x / np.linalg.norm(x, ord=2)
+        return np.linalg.norm(nmz(new_state) - nmz(state), ord=2) < 0.01
+
+    def check_conv_grov(self, next: NDArray):
+        n = len(self.path)
+        grov_mat = np.full((n, n), 2 / n) - np.identity(n)
+        beta_out = grov_mat @ list(zip(*self.path))[1]
+        out = np.array([p[1] * (2 / self.deg[p[0]] - 1) for p in self.path])
+        np_arc = np.array(self.arcs)
+        for path_id, (node, _) in enumerate(self.path):
+            for i in np.where(np_arc[:, 1] == node)[0]:
+                out[path_id] += (2 / self.deg[node]) * next[i]
+        return np.linalg.norm(out - beta_out, ord=2) < 0.001
+
+    def add_nodes(self, m: int):
+        probs = np.zeros(len(self.deg))
+        for edges, weight in zip(self.arcs, self.weights):
+            probs[edges[1]] += weight**2
+        for p in self.path:
+            probs[p[0]] += (p[1])**2
+        prevs = set()
+        for _ in range(m):
+            while True:
+                selected = np.random.choice(
+                    np.array(range(len(self.deg))), 1, p=probs/np.sum(probs))[0]
+                if selected in prevs:
+                    continue
+                prevs.add(selected)
+                break
+            self.arcs.extend([(len(self.deg), selected),
+                             (selected, len(self.deg))])
+            # self.weights=np.append(self.weights,[self.weights[-1]]*2)
+            self.weights = np.ones(len(self.arcs))
+            self.deg[selected] += 1
+        self.deg = np.append(self.deg, m)
+
+    def make_grover_matrix(self):
+        return make_grover_matrix(self.deg, np.array(self.arcs))
+    
+    ################
+
+    def non_flow_grover(self, n: int, v_prob: int):
+        mat=self.make_grover_matrix()
+        self.prob_origin=np.zeros(n)
+        for i in range(n):
+            probs=np.zeros(len(self.deg))
+            next = mat @ self.weights
+            for edges, weight in zip(self.arcs, self.weights):
+                probs[edges[1]] += weight**2
+            self.prob_origin[i]=probs[v_prob]/np.sum(probs)
+            self.weights = next
+        #     print(probs)
+        # print(self.prob_origin)
+
+    def plot_origin_prob(self):
+        plt.plot(self.prob_origin)
+        plt.show()
+    
+
+    #################
+    
     def build_comp_graph(self, n: int, path: List[Tuple[int, float]]):
         self.initial_graph = 'complete'
         node = list(map(int, range(n)))
         edges = [(a, b) for idx, a in enumerate(node) for b in node[idx + 1:]]
         self.initilize(n, edges)
+        self.path = path
+        for (node, _) in self.path:
+            self.deg[node] += 1
+        return self
+    
+    def build_comp_biber_graph(self, n: int, m: int, path: List[Tuple[int, float]]):
+        self.initial_graph = 'complete_bipertite'
+        node = list(map(int, range(n+m)))
+        edges = [(a, b) for a in range(n) for b in range(n,n+m)]
+        self.initilize(n+m, edges)
         self.path = path
         for (node, _) in self.path:
             self.deg[node] += 1
@@ -65,8 +176,7 @@ class QBA():
     def build_wheel_graph(self, n: int, path: List[Tuple[int, float]]):
         self.initial_graph = 'wheel'
         node = list(map(int, range(n)))
-        edges = [(0, a) for a in range(1, n)]+[(a, a+1)
-                                               for a in range(1, n-1)]+[(1, n-1)]
+        edges = [(a, a+1) for a in range(n-2)] + [(n-2, 0)] + [(a, n-1) for a in range(n-1)]
         self.initilize(n, edges)
         self.path = path
         for (node, _) in self.path:
@@ -104,78 +214,6 @@ class QBA():
         for (node, _) in self.path:
             self.deg[node] += 1
         return self
-
-    def run_qba(self, n: int, max: int):
-        self.times = []
-        for _ in range(n):
-            time_sta = time.perf_counter()
-            self.grover(max)
-            self.add_nodes(2)
-            time_end = time.perf_counter()
-            self.times.append(time_end - time_sta)
-        plot.plot_time(self.times)
-        plot.deg_plot(DiGraph(self.arcs))
-        plot.count_histgram(self.count)
-
-    def grover(self, n: int, end_on_conv: bool = True):
-
-        rho = np.zeros(len(self.arcs))
-        np_arc = np.array(self.arcs)
-        for (node, wgt) in self.path:
-            for i in np.where(np_arc[:, 0] == node)[0]:
-                rho[i] = (2 / self.deg[node]) * wgt
-
-        mat = self.make_grover_matrix()
-        for i in range(n):
-            next = mat @ self.weights + rho
-            if end_on_conv and self.check_conv(next, self.weights):
-                self.count.append(i)
-                self.weights = next
-                print(i)
-                return
-            self.weights = next
-        print("not converged")
-        self.count.append(n)
-
-    def check_conv(self, new_state: NDArray, state: NDArray):
-        def nmz(x): return x / np.linalg.norm(x, ord=2)
-        return np.linalg.norm(nmz(new_state) - nmz(state), ord=2) < 0.01
-
-    def check_conv_grov(self, next: NDArray):
-        n = len(self.path)
-        grov_mat = np.full((n, n), 2 / n) - np.identity(n)
-        beta_out = grov_mat @ list(zip(*self.path))[1]
-        out = np.array([p[1] * (2 / self.deg[p[0]] - 1) for p in self.path])
-        np_arc = np.array(self.arcs)
-        for path_id, (node, _) in enumerate(self.path):
-            for i in np.where(np_arc[:, 1] == node)[0]:
-                out[path_id] += (2 / self.deg[node]) * next[i]
-        return np.linalg.norm(out - beta_out, ord=2) < 0.01
-
-    def add_nodes(self, m: int):
-        probs = np.zeros(len(self.deg))
-        for edges, weight in zip(self.arcs, self.weights):
-            probs[edges[1]] += weight**2
-        for p in self.path:
-            probs[p[0]] += (p[1])**2
-        prevs = set()
-        for _ in range(m):
-            while True:
-                selected = np.random.choice(
-                    np.array(range(len(self.deg))), 1, p=probs/np.sum(probs))[0]
-                if selected in prevs:
-                    continue
-                prevs.add(selected)
-                break
-            self.arcs.extend([(len(self.deg), selected),
-                             (selected, len(self.deg))])
-            # self.weights=np.append(self.weights,[self.weights[-1]]*2)
-            self.weights = np.ones(len(self.arcs))
-            self.deg[selected] += 1
-        self.deg = np.append(self.deg, m)
-
-    def make_grover_matrix(self):
-        return make_grover_matrix(self.deg, np.array(self.arcs))
 
 
 @njit(parallel=True)

@@ -3,6 +3,7 @@ import numpy as np
 import random
 import networkx as nx
 import time
+import plot
 
 
 class BAModel():
@@ -29,8 +30,9 @@ class BAModel():
                     break
 
     def draw(self):
-        nx.draw(self.G, with_labels=True)
-        plt.show()
+        # nx.draw(self.G, with_labels=True)
+        # plt.show()
+        plot.deg_plot(self.G)
 
 
 class BAModel_Opt:

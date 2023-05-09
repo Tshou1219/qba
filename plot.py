@@ -28,6 +28,12 @@ def deg_plot(G: nx.DiGraph):
     degree_sequence = sorted(
         (d for n, d in G.to_undirected().degree()), reverse=True)
     dmax = max(degree_sequence)
+    #######
+    # print(degree_sequence)
+    # print(np.log(degree_sequence))
+    # print(*np.unique(degree_sequence))
+    # print(*np.unique(np.log(degree_sequence)))
+    #######
 
     fig = plt.figure("Degree of a random graph",
                      facecolor="azure", edgecolor="coral", figsize=(8, 8))
@@ -44,16 +50,21 @@ def deg_plot(G: nx.DiGraph):
     ax0.set_axis_off()
 
     ax1 = fig.add_subplot(axgrid[3:, :2])
-    ax1.plot(degree_sequence, "b-", marker="o")
+    ax1.plot(degree_sequence, "b-", marker="o") ###log 
     ax1.set_title("Degree Rank Plot")
     ax1.set_ylabel("Degree")
     ax1.set_xlabel("Rank")
+    # ax1.set_xscale('log')
+    # ax1.set_yscale('log')
 
     ax2 = fig.add_subplot(axgrid[3:, 2:])
     ax2.bar(*np.unique(degree_sequence, return_counts=True))
+    # ax2.plot(*np.unique(degree_sequence, return_counts=True),"b-", marker="o")
     ax2.set_title("Degree histogram")
     ax2.set_xlabel("Degree")
     ax2.set_ylabel("# of Nodes")
+    # ax2.set_xscale('log')
+    # ax2.set_yscale('log')
 
     fig.tight_layout()
 
