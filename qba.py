@@ -8,6 +8,7 @@ from numba.core.errors import NumbaPendingDeprecationWarning
 from numpy.typing import NDArray
 import plot
 warnings.simplefilter('ignore', category=NumbaPendingDeprecationWarning)
+np.set_printoptions(precision=3, floatmode='fixed')
 
 import matplotlib.pyplot as plt
 
@@ -113,23 +114,54 @@ class QBA():
     
     ################
 
-    def non_flow_grover(self, n: int, v_prob: int):
+    def non_flow_grover(self, n: int, v_prob, num_pin = 0):
         mat=self.make_grover_matrix()
+        ## 最後だけ反転させる
+        mat = mat @ self.grover_inv(num_pin)
+        mat=mat.T
+
+        ##
+        for i in range(len(self.arcs)):
+            mat[i][len(self.arcs)-2]=0
+        mat[len(self.arcs)-1][len(self.arcs)-2]=-1
+        ##
+        print(mat)
+        ##
         self.prob_origin=np.zeros(n)
         for i in range(n):
             probs=np.zeros(len(self.deg))
             next = mat @ self.weights
             for edges, weight in zip(self.arcs, self.weights):
-                probs[edges[1]] += weight**2
-            self.prob_origin[i]=probs[v_prob]/np.sum(probs)
+                probs[edges[1]] += weight**2     ##### 重みを二乗して足す
+            # print(self.arcs)
+            # print(self.weights)
+            # print(probs)
+            for j in v_prob:
+                self.prob_origin[i]+=probs[j]/np.sum(probs)
             self.weights = next
         #     print(probs)
         # print(self.prob_origin)
 
+    def grover_inv(self, num_pin):
+        mat=np.identity(len(self.arcs))
+        for i in range(num_pin):
+            mat[len(self.arcs)-i-1][len(self.arcs)-i-1]=-1
+        return mat
+
+
     def plot_origin_prob(self):
+        plt.figure(facecolor="azure", edgecolor="coral")
         plt.plot(self.prob_origin)
-        plt.show()
-    
+        plt.show()    
+
+    # def add_comp_graph(self, n: int, add_v: int):
+    #     node = list(map(int, range(len(self.deg),n+len(self.deg))))
+    #     edges = [(a, b) for idx, a in enumerate(node) for b in node[idx + 1:]]
+    #     edges.extend([(len(self.deg),add_v),(add_v,len(self.deg))])
+    #     self.arcs.extend(edges)
+    #     print(edges)
+    #     print(self.deg)
+    #     self.initilize(n+len(self.deg), self.arcs)
 
     #################
     
@@ -138,6 +170,18 @@ class QBA():
         node = list(map(int, range(n)))
         edges = [(a, b) for idx, a in enumerate(node) for b in node[idx + 1:]]
         self.initilize(n, edges)
+        self.path = path
+        for (node, _) in self.path:
+            self.deg[node] += 1
+        return self
+    
+    def build_comp_add_graph(self, n: int, m: int, path: List[Tuple[int, float]]):
+        node = list(map(int, range(n)))
+        edges = [(a, b) for idx, a in enumerate(node) for b in node[idx + 1:]]
+        node = list(map(int, range(n,n+m)))
+        edges.extend([(a, b) for idx, a in enumerate(node) for b in node[idx + 1:]])
+        edges.extend([(n-1,n),(n,n-1)])
+        self.initilize(n+m, edges)
         self.path = path
         for (node, _) in self.path:
             self.deg[node] += 1
