@@ -114,18 +114,21 @@ class QBA():
     
     ################
 
-    def non_flow_grover(self, n: int, v_prob, num_pin = 0):
+    def non_flow_grover(self, n: int, v_prob, num_pin = 0, inverse=False):
         mat=self.make_grover_matrix()
+        # print(mat)
         ## 最後だけ反転させる
-        mat = mat @ self.grover_inv(num_pin)
-        mat=mat.T
-
+        # mat = mat @ self.grover_inv(num_pin)
+        if inverse:
+            mat = self.grover_c(mat,num_pin)
+        # print(np.linalg.eig(mat))
+        # mat=mat.T
+        # print(mat)
         ##
-        for i in range(len(self.arcs)):
-            mat[i][len(self.arcs)-2]=0
-        mat[len(self.arcs)-1][len(self.arcs)-2]=-1
-        ##
-        print(mat)
+        # for i in range(len(self.arcs)):
+        #     mat[i][len(self.arcs)-2]=0
+        # mat[len(self.arcs)-1][len(self.arcs)-2]=-1
+        # print(mat)
         ##
         self.prob_origin=np.zeros(n)
         for i in range(n):
@@ -137,7 +140,35 @@ class QBA():
             # print(self.weights)
             # print(probs)
             for j in v_prob:
-                self.prob_origin[i]+=probs[j]/np.sum(probs)
+                if np.sum(probs)==0:
+                    break
+                else:
+                    self.prob_origin[i]+=probs[j]/np.sum(probs)
+            self.weights = next
+        #     print(probs)
+        # print(self.prob_origin)
+
+    def non_flow_grover_arcs(self, n: int, arc_prob, num_pin = 0, inverse=False):
+        mat=self.make_grover_matrix()
+        # print(mat)
+        ## 最後だけ反転させる
+        # mat = mat @ self.grover_inv(num_pin)
+        if inverse:
+            mat = self.grover_c(mat,num_pin)
+        self.prob_origin=np.zeros(n)
+        for i in range(n):
+            probs=np.zeros(len(self.deg))
+            next = mat @ self.weights
+            for edges, weight in zip(self.arcs, self.weights):
+                probs[edges[1]] += weight**2     ##### 重みを二乗して足す
+            # print(self.arcs)
+            # print(self.weights)
+            # print(probs)
+            for j in arc_prob:
+                if np.sum(probs)==0:
+                    break
+                else:
+                    self.prob_origin[i]+=self.weights[self.arcs.index(j)]**2/np.sum(probs)
             self.weights = next
         #     print(probs)
         # print(self.prob_origin)
@@ -146,8 +177,15 @@ class QBA():
         mat=np.identity(len(self.arcs))
         for i in range(num_pin):
             mat[len(self.arcs)-i-1][len(self.arcs)-i-1]=-1
+        # for i in range(len(self.arcs)):
+        #     mat[i][len(self.arcs)-1]=-1*mat[i][len(self.arcs)-1]
         return mat
 
+    def grover_c(self,mat,num_pin):
+        for i in range(len(self.arcs)):
+            for j in range(num_pin):
+                mat[i][len(self.arcs)-j-2]=-1*mat[i][len(self.arcs)-j-2]
+        return mat
 
     def plot_origin_prob(self):
         plt.figure(facecolor="azure", edgecolor="coral")
@@ -163,6 +201,8 @@ class QBA():
     #     print(self.deg)
     #     self.initilize(n+len(self.deg), self.arcs)
 
+    def find_hamming_distance(self, x,y):
+        return bin(x^y).count('1')
     #################
     
     def build_comp_graph(self, n: int, path: List[Tuple[int, float]]):
@@ -175,6 +215,21 @@ class QBA():
             self.deg[node] += 1
         return self
     
+    def build_hypercube(self, n: int, path: List[Tuple[int, float]]):
+        self.initial_graph = 'hypercybe'
+        node = list(map(int, range(2**n)))
+        edges = []
+        for i in range(2**n): 
+            for j in range(i, 2**n):
+                if self.find_hamming_distance(i,j)==1:
+                    edges.extend([(i,j)])
+        # print(len(edges))
+        self.initilize(2**n, edges)
+        self.path = path
+        for (node, _) in self.path:
+            self.deg[node] += 1
+        return self
+    
     def build_comp_add_graph(self, n: int, m: int, path: List[Tuple[int, float]]):
         node = list(map(int, range(n)))
         edges = [(a, b) for idx, a in enumerate(node) for b in node[idx + 1:]]
@@ -182,6 +237,23 @@ class QBA():
         edges.extend([(a, b) for idx, a in enumerate(node) for b in node[idx + 1:]])
         edges.extend([(n-1,n),(n,n-1)])
         self.initilize(n+m, edges)
+        self.path = path
+        for (node, _) in self.path:
+            self.deg[node] += 1
+        return self
+    
+    def build_barbell_graph(self, num_of_vertex:List[int], path: List[Tuple[int, float]]):
+        edges=[]
+        node = list(map(int, range(num_of_vertex[0])))
+        edges = [(a, b) for idx, a in enumerate(node) for b in node[idx + 1:]]
+        for i in range(1,len(num_of_vertex)):
+            node = list(map(int, range(sum(num_of_vertex[0:i]),sum(num_of_vertex[0:i+1]))))
+            edges.extend([(a, b) for idx, a in enumerate(node) for b in node[idx + 1:]])
+            edges.extend([(sum(num_of_vertex[0:i])-1,sum(num_of_vertex[0:i])),(sum(num_of_vertex[0:i]),sum(num_of_vertex[0:i])-1)])
+        self.initilize(sum(num_of_vertex),edges)
+        for i in range(1,len(num_of_vertex)):
+            self.deg[sum(num_of_vertex[0:i])-1]-=1
+            self.deg[sum(num_of_vertex[0:i])]-=1
         self.path = path
         for (node, _) in self.path:
             self.deg[node] += 1
