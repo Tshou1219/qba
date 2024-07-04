@@ -2,6 +2,8 @@ import time
 import warnings
 from typing import List, Tuple
 import numpy as np
+import math
+import itertools
 from networkx import DiGraph
 from numba import njit, prange
 from numba.core.errors import NumbaPendingDeprecationWarning
@@ -51,7 +53,7 @@ class QBA():
         plot.deg_plot(DiGraph(self.arcs))
         plot.count_histgram(self.count)
 
-    def grover(self, n: int, end_on_conv: bool = True):
+    def grover(self, n: int, v_inverse, v_prob, end_on_conv: bool = True, phase_reverse: bool = True):
 
         rho = np.zeros(len(self.arcs))
         np_arc = np.array(self.arcs)
@@ -60,21 +62,47 @@ class QBA():
                 rho[i] = (2 / self.deg[node]) * wgt
         # print(rho)
         mat = self.make_grover_matrix()
+        # print(mat)
+        if phase_reverse:
+            mat = self.phase_reverse_matrix(mat, v_inverse)
+        # print(mat)
+        self.prob_origin=np.zeros(n)
         for i in range(n):
+            probs=np.zeros(len(self.deg))
             next = mat @ self.weights + rho ## normal 
+            for edges, weight in zip(self.arcs, self.weights):
+                probs[edges[1]] += weight**2     ##### 重みを二乗して足す
             # next = mat @ self.weights + rho * pow(-1 , len(self.deg)) ## change rho's parity
             # if end_on_conv and self.check_conv(next, self.weights): ## convergence check
-            if end_on_conv and self.check_conv_grov(next):
-                self.count.append(i)
-                self.weights = next
-                return
+            for j in v_prob:
+                if np.sum(probs)==0:
+                    break
+                else:
+                    self.prob_origin[i]+=probs[j]/np.sum(probs)
+            # if end_on_conv and self.check_conv(next, mat @ next + rho):
+            #     self.count.append(i)
+            #     self.weights = next
+            #     return
             self.weights = next
-        print("not converged")
+        # print("not converged")
         self.count.append(n)
+
+    def phase_reverse_matrix(self, mat, v_prob):
+        z=[]
+        for i in v_prob:
+            for j in range(len(self.deg)):
+                if (j,i) in self.arcs:
+                    z.append(self.arcs.index((j,i)))
+
+        for i in range(len(self.arcs)):
+            for j in z:
+                # print((i,j))
+                mat[i][j]=-1*mat[i][j]
+        return mat
 
     def check_conv(self, new_state: NDArray, state: NDArray):
         def nmz(x): return x / np.linalg.norm(x, ord=2)
-        return np.linalg.norm(nmz(new_state) - nmz(state), ord=2) < 0.01
+        return np.linalg.norm(nmz(new_state) - nmz(state), ord=2) < 0.0001
 
     def check_conv_grov(self, next: NDArray):
         n = len(self.path)
@@ -188,9 +216,13 @@ class QBA():
         return mat
 
     def plot_origin_prob(self):
-        plt.figure(facecolor="azure", edgecolor="coral")
+        plt.figure(facecolor="white", edgecolor="coral")
         plt.plot(self.prob_origin)
-        plt.show()    
+        # plt.ylim(0,1)
+        plt.show()
+        print(max(self.prob_origin), np.argmax(self.prob_origin))
+        # print(self.prob_origin[-1])
+        # print(self.prob_origin)
 
     # def add_comp_graph(self, n: int, add_v: int):
     #     node = list(map(int, range(len(self.deg),n+len(self.deg))))
@@ -203,6 +235,53 @@ class QBA():
 
     def find_hamming_distance(self, x,y):
         return bin(x^y).count('1')
+    
+
+    def grover_c_test(self, mat,num_pin, add_v):
+        num_of_v=len(self.deg)-num_pin*len(add_v)
+        count=-1
+        z=[]
+        for j in add_v:
+            count+=1
+            for k in range(num_pin):
+                x=num_of_v+k+count*num_pin
+                # print(k)
+                # print(j,x)
+                if (j,x) in self.arcs:
+                    z.append(self.arcs.index((j,x)))
+        # print(z)
+        for i in range(len(self.arcs)):
+            for j in z:
+                # print((i,j))
+                mat[i][j]=-1*mat[i][j]
+        return mat
+
+    def non_flow_grover_arcs_test(self, n: int, arc_prob, add_v, num_pin = 0,   inverse=False):
+        mat=self.make_grover_matrix()
+        #print(mat)
+        ## 最後だけ反転させる
+        # mat = mat @ self.grover_inv(num_pin)
+        if inverse:
+            mat = self.grover_c_test(mat,num_pin, add_v)
+        # print(mat)
+        self.prob_origin=np.zeros(n)
+        for i in range(n):
+            probs=np.zeros(len(self.deg))
+            next = mat @ self.weights
+            for edges, weight in zip(self.arcs, self.weights):
+                probs[edges[1]] += weight**2     ##### 重みを二乗して足す
+            # print(self.arcs)
+            # print(self.weights)
+            # print(probs)
+            for j in arc_prob:
+                if np.sum(probs)==0:
+                    break
+                else:
+                    self.prob_origin[i]+=self.weights[self.arcs.index(j)]**2/np.sum(probs)
+            self.weights = next
+        #     print(probs)
+        # print(self.prob_origin)
+
     #################
     
     def build_comp_graph(self, n: int, path: List[Tuple[int, float]]):
@@ -215,7 +294,7 @@ class QBA():
             self.deg[node] += 1
         return self
     
-    def build_hypercube(self, n: int, path: List[Tuple[int, float]]):
+    def build_hypercube_graph(self, n: int, path: List[Tuple[int, float]]):
         self.initial_graph = 'hypercybe'
         node = list(map(int, range(2**n)))
         edges = []
@@ -298,6 +377,27 @@ class QBA():
         for (node, _) in self.path:
             self.deg[node] += 1
         return self
+    
+    def build_Johnson_graph(self, n: int, k: int, path: List[Tuple[int, float]]):
+        c=math.comb(n,k)
+        node = list(map(int, range(c)))
+        lis=list(map(int, range(n)))
+        com=list()
+        edges=[]
+        for lis in itertools.combinations(lis, k):
+            com.append(lis)
+        # print(com)
+        for i in range(len(com)):
+            for j in range(i+1, len(com)):
+                # print(set(com[i]),set(com[j]), len(set(com[i]) & set(com[j])))
+                if len(set(com[i]) & set(com[j]))==k-1:
+                    edges = edges + [(i,j)]
+        # print(len(edges))
+        self.initilize(c, edges)
+        self.path = path
+        for (node, _) in self.path:
+            self.deg[node] += 1
+        return self
 
     def build_path_graph(self, n: int, path: List[Tuple[int, float]]):
         self.initial_graph = 'path'
@@ -329,6 +429,35 @@ class QBA():
         self.path = path
         for (node, _) in self.path:
             self.deg[node] += 1
+        return self
+    
+    def star_product(self, G_1, G_2):
+        n_1=len(G_1.deg)
+        n_2=len(G_2.deg)
+        node = list(map(int, range(n_1+n_2-1)))
+        G_2.arcs = [(a+n_1-1,b+n_1-1) for (a,b) in G_2.arcs]
+        edges = G_1.arcs + G_2.arcs 
+        self.initilize(n_1+n_2-1, edges)
+        self.deg= [int(a/2) for a in self.deg]
+        return self
+
+    def star_product_with_bridge(self, G_1, G_2):
+        n_1=len(G_1.deg)
+        n_2=len(G_2.deg)
+        node = list(map(int, range(n_1+n_2)))
+        G_2.arcs = [(a+n_1,b+n_1) for (a,b) in G_2.arcs]
+        edges = G_1.arcs + G_2.arcs + [(0, n_1)] + [(n_1, 0)]
+        self.initilize(n_1+n_2, edges)
+        self.deg= [int(a/2) for a in self.deg]
+        return self
+    
+    def build_cartesian_product(self, G_1, G_2):
+        n_1=len(G_1.deg)
+        n_2=len(G_2.deg)
+        node = list(map(int, range(n_1+n_2)))
+        G_2.arcs = [(a+n_1,b+n_1) for (a,b) in G_2.arcs]
+        edges = G_1.arcs + G_2.arcs
+        self.initilize(n_1+n_2, edges)
         return self
 
 
