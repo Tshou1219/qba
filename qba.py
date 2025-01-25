@@ -201,6 +201,31 @@ class QBA():
         #     print(probs)
         # print(self.prob_origin)
 
+    def non_flow_grover_arcs_with_olacle(self, n: int, arc_prob, v_change, inverse=False):
+        mat=self.make_grover_matrix()
+        # print(mat)
+        ## 最後だけ反転させる
+        # mat = mat @ self.grover_inv(num_pin)
+        if inverse:
+            mat = self.phase_reverse_matrix(self, mat, v_change)
+        self.prob_origin=np.zeros(n)
+        for i in range(n):
+            probs=np.zeros(len(self.deg))
+            next = mat @ self.weights
+            for edges, weight in zip(self.arcs, self.weights):
+                probs[edges[1]] += weight**2     ##### 重みを二乗して足す
+            # print(self.arcs)
+            # print(self.weights)
+            # print(probs)
+            for j in arc_prob:
+                if np.sum(probs)==0:
+                    break
+                else:
+                    self.prob_origin[i]+=self.weights[self.arcs.index(j)]**2/np.sum(probs)
+            self.weights = next
+        #     print(probs)
+        # print(self.prob_origin)
+
     def grover_inv(self, num_pin):
         mat=np.identity(len(self.arcs))
         for i in range(num_pin):
@@ -218,8 +243,9 @@ class QBA():
     def plot_origin_prob(self):
         plt.figure(facecolor="white", edgecolor="coral")
         plt.plot(self.prob_origin)
-        # plt.ylim(0,1)
+        plt.ylim(0,1)
         plt.show()
+        self.prob_origin=np.delete(self.prob_origin,0)
         print(max(self.prob_origin), np.argmax(self.prob_origin))
         # print(self.prob_origin[-1])
         # print(self.prob_origin)
@@ -357,6 +383,22 @@ class QBA():
         for (node, _) in self.path:
             self.deg[node] += 1
         return self
+    
+    def build_two_dim_torus(self, n: int, path: List[Tuple[int, float]]):
+        node = list(map(int, range(n*n)))
+        edges = []
+        for i in range(n):
+            for j in range(n):
+                edges = edges + [(i*n+j, i*n+j%n+1)]
+        # for i in range(n):
+        #     for j in range(n):
+        #         edges = edges + [((i*n+j)%(n*n), (i*n+j+n)%(n*n))]
+        print(edges)
+        self.initilize(n*n, edges)
+        self.path = path
+        for (node, _) in self.path:
+            self.deg[node] += 1
+        return self
 
     def build_star_graph(self, n: int, path: List[Tuple[int, float]]):
         self.initial_graph = 'star'
@@ -431,7 +473,7 @@ class QBA():
             self.deg[node] += 1
         return self
     
-    def star_product(self, G_1, G_2):
+    def star_product(self, G_1, G_2, path: List[Tuple[int, float]]):
         n_1=len(G_1.deg)
         n_2=len(G_2.deg)
         node = list(map(int, range(n_1+n_2-1)))
@@ -439,6 +481,9 @@ class QBA():
         edges = G_1.arcs + G_2.arcs 
         self.initilize(n_1+n_2-1, edges)
         self.deg= [int(a/2) for a in self.deg]
+        self.path = path
+        for (node, _) in self.path:
+            self.deg[node] += 1
         return self
 
     def star_product_with_bridge(self, G_1, G_2):
@@ -451,13 +496,154 @@ class QBA():
         self.deg= [int(a/2) for a in self.deg]
         return self
     
-    def build_cartesian_product(self, G_1, G_2):
+    def build_cartesian_product(self, G_1, G_2, path: List[Tuple[int, float]]):
         n_1=len(G_1.deg)
         n_2=len(G_2.deg)
-        node = list(map(int, range(n_1+n_2)))
-        G_2.arcs = [(a+n_1,b+n_1) for (a,b) in G_2.arcs]
-        edges = G_1.arcs + G_2.arcs
-        self.initilize(n_1+n_2, edges)
+        node = list(map(int, range(n_1*n_2)))
+        # G_2.arcs = [(a+n_1,b+n_1) for (a,b) in G_2.arcs]
+        G_1.arcs = [(a*n_2,b*n_2) for (a,b) in G_1.arcs]
+        edges = G_2.arcs + [(a+n_2*c,b+n_2*c) for (a,b) in G_2.arcs for c in range(n_1)] + G_1.arcs + [(a+c,b+c) for (a,b) in G_1.arcs for c in range(n_2)]
+        self.arcs = list(DiGraph(edges).edges())
+        self.weights, self.deg = np.zeros(
+            len(self.arcs)), np.zeros(n_1*n_2, dtype=int)
+        ### set initial state
+        # self.weights[0] = 1.
+        # for i in range(len(self.arcs)):
+        #     self.weights[i]=1.
+        #######
+        self.arcs.sort()
+        # print(self.arcs)
+        self.initial_state = self.weights
+        for edge in self.arcs:
+            self.deg[edge[0]] += 1
+            self.deg[edge[1]] += 1
+        self.deg= [int(a/2) for a in self.deg]
+        self.path = path
+        for (node, _) in self.path:
+            self.deg[node] += 1
+        return self
+    
+    # def build_direct_product(self, G_1, G_2, path: List[Tuple[int, float]]):
+    #     n_1=len(G_1.deg)
+    #     n_2=len(G_2.deg)
+    #     node = list(map(int, range(n_1*n_2)))
+    #     # G_2.arcs = [(a+n_1,b+n_1) for (a,b) in G_2.arcs]
+    #     G_1.arcs = [(a*n_2,b*n_2) for (a,b) in G_1.arcs]
+    #     edges = G_2.arcs + [(a+n_2*c,b+n_2*c) for (a,b) in G_2.arcs for c in range(n_1)] + G_1.arcs + [(a+c,b+c) for (a,b) in G_1.arcs for c in range(n_2)]
+    #     self.arcs = list(DiGraph(edges).edges())
+    #     self.weights, self.deg = np.zeros(
+    #         len(self.arcs)), np.zeros(n_1*n_2, dtype=int)
+    #     ### set initial state
+    #     # self.weights[0] = 1.
+    #     # for i in range(len(self.arcs)):
+    #     #     self.weights[i]=1.
+    #     #######
+    #     self.arcs.sort()
+    #     # print(self.arcs)
+    #     self.initial_state = self.weights
+    #     for edge in self.arcs:
+    #         self.deg[edge[0]] += 1
+    #         self.deg[edge[1]] += 1
+    #     self.deg= [int(a/2) for a in self.deg]
+    #     self.path = path
+    #     for (node, _) in self.path:
+    #         self.deg[node] += 1
+    #     return self
+
+    def make_line_graph(self, G, PATH):
+        num_of_v=len(G.deg)
+        num_of_e=int (len(G.arcs)/2)
+        inci_mat=np.zeros((num_of_v, num_of_e), dtype=int)
+        edge =[]
+        for (a,b) in G.arcs:
+            if (b,a) not in edge:
+                edge = edge + [(a,b)]
+        for i in range(num_of_v):
+            for j,(a,b) in enumerate(edge):
+                if i in (a,b):
+                    inci_mat[i][j]=1
+        adjace_mat=inci_mat.T@inci_mat-2*np.identity(num_of_e, dtype=int)
+        self.make_graph_by_adjacency_matrix(adjace_mat,PATH)
+        return self
+    
+    def make_total_graph(self, G, PATH):
+        num_of_v=len(G.deg)
+        num_of_e=int (len(G.arcs)/2)
+        adja_G=G.make_adjacency_matrix()
+        line_G=self.make_line_graph(G, PATH)
+        adja_line_graph=line_G.make_adjacency_matrix()
+        # print(adja_G)
+        # print(adja_line_graph)
+
+        inci_mat=np.zeros((num_of_v, num_of_e), dtype=int)
+        edge =[]
+        for (a,b) in G.arcs:
+            if (b,a) not in edge:
+                edge = edge + [(a,b)]
+        for i in range(num_of_v):
+            for j,(a,b) in enumerate(edge):
+                if i in (a,b):
+                    inci_mat[i][j]=1
+        # print(inci_mat)
+
+        adja_total=np.zeros((num_of_e+num_of_v,num_of_e+num_of_v), dtype=int)
+        for i in range(num_of_v):
+            for j in range(num_of_v):
+                adja_total[i][j]=adja_G[i][j]
+
+        for i in range(num_of_v,num_of_v+num_of_e):
+            for j in range(num_of_v,num_of_v+num_of_e):
+                adja_total[i][j]=adja_line_graph[i-num_of_v][j-num_of_v]
+
+        for i in range(num_of_v):
+            for j in range(num_of_v,num_of_v+num_of_e):
+                adja_total[i][j]=inci_mat[i][j-num_of_v]
+
+        for i in range(num_of_v, num_of_v+num_of_e):
+            for j in range(num_of_v):
+                adja_total[i][j]=inci_mat.T[i-num_of_v][j]
+
+        # print(adja_total)
+        self.make_graph_by_adjacency_matrix(adja_total,PATH)
+        return self
+
+    def make_adjacency_matrix(self):
+        n=len(self.deg)
+        self.ad_mat=np.zeros((n,n), dtype=int)
+        for (a,b) in self.arcs:
+            self.ad_mat[a][b]+=1
+        return self.ad_mat
+    
+    def make_graph_by_adjacency_matrix(self, mat, path: List[Tuple[int, float]]):
+        n=len(mat)
+        node = list(map(int, range(n)))
+        edges=[]
+        for i in range(n):
+            for j in range(n):
+                if mat[i][j]==1:
+                    edges.append((i,j))
+        self.initilize(n, edges)
+        self.deg= [int(a/2) for a in self.deg]
+        self.path = path
+        for (node, _) in self.path:
+            self.deg[node] += 1
+        return self
+    
+    def build_cartesian_product_by_adjacency(self, mat_1, mat_2, path: List[Tuple[int, float]]):
+        n_1=len(mat_1)
+        n_2=len(mat_2)
+        # print(np.kron(mat_1,np.identity(n_2,dtype=int))+np.kron(np.identity(n_1,dtype=int),mat_2))
+        self.make_graph_by_adjacency_matrix(np.kron(mat_1,np.identity(n_2,dtype=int))+np.kron(np.identity(n_1,dtype=int),mat_2), path)
+        return self
+    
+    def build_direct_product_by_adjacency(self, mat_1, mat_2, path: List[Tuple[int, float]]):
+        self.make_graph_by_adjacency_matrix(np.kron(mat_1, mat_2), path)
+        return self
+    
+    def build_strong_product_by_adjacency(self, mat_1, mat_2, path: List[Tuple[int, float]]):
+        n_1=len(mat_1)
+        n_2=len(mat_2)
+        self.make_graph_by_adjacency_matrix(np.kron(mat_1,np.identity(n_2,dtype=int))+np.kron(np.identity(n_1,dtype=int),mat_2)+np.kron(mat_1, mat_2), path)
         return self
 
 
