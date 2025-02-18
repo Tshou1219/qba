@@ -39,8 +39,6 @@ class QBA():
                  for edge, weight in zip(self.arcs, self.weights)}
         plot.plot_arc(DiGraph(self.arcs), label)
 
-    
-
     def run_qba(self, n: int, max: int):
         self.times = []
         for _ in range(n):
@@ -225,6 +223,22 @@ class QBA():
             self.weights = next
         #     print(probs)
         # print(self.prob_origin)
+
+
+    def grover_with_epsilon(self, times: int, arc_prob, epsilon: float, bridge_vertex):
+        mat=make_grover_matrix_with_epsilon(self.deg, np.array(self.arcs), epsilon, bridge_vertex)
+        self.prob_origin=np.zeros(times)
+        for i in range(times):
+            probs=np.zeros(len(self.deg))
+            next = mat @ self.weights
+            for edges, weight in zip(self.arcs, self.weights):
+                probs[edges[1]] += weight**2     ##### 重みを二乗して足す
+            for j in arc_prob:
+                if np.sum(probs)==0:
+                    break
+                else:
+                    self.prob_origin[i]+=self.weights[self.arcs.index(j)]**2/np.sum(probs)
+            self.weights = next
 
     def grover_inv(self, num_pin):
         mat=np.identity(len(self.arcs))
@@ -572,7 +586,9 @@ class QBA():
         adja_G=G.make_adjacency_matrix()
         line_G=self.make_line_graph(G, PATH)
         adja_line_graph=line_G.make_adjacency_matrix()
-        # print(adja_G)
+
+        # print(adja_G/G.deg[0])
+        # print(np.linalg.eig(adja_G/G.deg[0]))
         # print(adja_line_graph)
 
         inci_mat=np.zeros((num_of_v, num_of_e), dtype=int)
@@ -603,8 +619,14 @@ class QBA():
             for j in range(num_of_v):
                 adja_total[i][j]=inci_mat.T[i-num_of_v][j]
 
-        # print(adja_total)
         self.make_graph_by_adjacency_matrix(adja_total,PATH)
+        # print(adja_total)
+        # print(np.linalg.eig(adja_total))
+        # P=adja_total/self.deg[0]
+        # print(P)
+        # print(np.linalg.eig(P))
+        
+
         return self
 
     def make_adjacency_matrix(self):
@@ -656,4 +678,28 @@ def make_grover_matrix(deg: NDArray, arcs: NDArray) -> NDArray:
             if arcs[i][1] == arcs[j][0]:
                 mat[j, i] = 2/(deg[arcs[i][1]]) - \
                     1 if arcs[i][0] == arcs[j][1] else 2/(deg[arcs[i][1]])
+    return mat
+
+@njit(parallel=True)
+def make_grover_matrix_with_epsilon(deg: NDArray, arcs: NDArray, epsilon: float, bridge_vertex) -> NDArray:
+    n = len(arcs)
+    mat = np.zeros((n, n))
+    for i in prange(n):
+        for j in prange(n):
+            if arcs[i][1] == arcs[j][0]: ## 隣接してる？
+                if arcs[i][1] not in bridge_vertex: ## 入力のarcの行先がperturbation入れたいvertex？
+                    mat[j, i] = 2/(deg[arcs[i][1]]) - \
+                        1 if arcs[i][0] == arcs[j][1] else 2/(deg[arcs[i][1]])
+                elif arcs[i][0] not in bridge_vertex: ## 入力のarcはbridge？
+                    if arcs[i][0] == arcs[j][1]: ## 反射？
+                        mat[j, i] = 2/(deg[arcs[i][1]]-1+epsilon) - 1
+                    elif arcs[j][1] in bridge_vertex : ## 出力先のarcはbridge？
+                        mat[j, i] = (2*math.sqrt(epsilon))/(deg[arcs[i][1]]-1+epsilon)
+                    else:
+                        mat[j, i] = 2/(deg[arcs[i][1]]-1+epsilon)
+                else:
+                    if arcs[i][0] == arcs[j][1]: ## 反射？
+                        mat[j, i] = (2*epsilon)/(deg[arcs[i][1]]-1+epsilon) - 1
+                    else:
+                        mat[j, i] = (2*math.sqrt(epsilon))/(deg[arcs[i][1]]-1+epsilon)
     return mat
